@@ -2,6 +2,4 @@ flask>=3.0
 requests>=2.31
 beautifulsoup4>=4.12
 pdfplumber>=0.10
-PyMuPDF>=1.23
-pandas>=2.0
 anthropic>=0.25

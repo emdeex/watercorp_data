@@ -24,6 +24,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 async function loadConfig() {
   try {
     const resp = await fetch("/api/config");
+    if (!resp.ok) {
+      const body = await resp.text().catch(() => "(no body)");
+      logLine(`Config API error ${resp.status}: ${body.slice(0, 300)}`, "error");
+      document.getElementById("corp-list").innerHTML = '<span class="text-danger small">Failed to load — see Progress tab for details.</span>';
+      document.getElementById("year-list").innerHTML = "";
+      return;
+    }
     const cfg  = await resp.json();
     allCorps = cfg.corporations;
     allYears = cfg.years;
@@ -32,6 +39,7 @@ async function loadConfig() {
     document.getElementById("btn-run").disabled = false;
   } catch (e) {
     logLine("Failed to load configuration: " + e, "error");
+    document.getElementById("corp-list").innerHTML = '<span class="text-danger small">Network error — see Progress tab.</span>';
   }
 }
 

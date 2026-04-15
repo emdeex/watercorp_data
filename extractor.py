@@ -15,7 +15,8 @@ import os
 import re
 import tempfile
 
-import pdfplumber
+# pdfplumber is imported lazily inside functions to avoid Lambda cold-start
+# failures when the native dependency chain (Pillow etc.) isn't available.
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +91,7 @@ def extract(pdf_bytes: bytes, corp_name: str, year: str, use_llm: bool = False) 
     }
 
     try:
+        import pdfplumber  # lazy import — keeps Flask startup fast on Vercel
         with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
             pages = pdf.pages[SKIP_PAGES_BEFORE:]
 
