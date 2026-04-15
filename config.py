@@ -38,22 +38,21 @@ TMP_DIR = "/tmp/watercorp_reports"
 # Corporation definitions
 #
 # Each entry has:
-#   name           — display name
-#   slug           — short identifier used in file paths
-#   website        — base URL (no trailing slash)
-#   report_pages   — list of URL paths to try when looking for the annual
-#                    report listing page (tried in order)
-#   is_gww_predecessor — True for the two corps that merged into GWW
+#   name               — display name
+#   slug               — short identifier used in file paths
+#   website            — base URL (no trailing slash); verified against live sites
+#   report_pages       — listing page paths to try in order; confirmed correct
+#   is_gww_predecessor — True for the two corps that merged into GWW (2021-22)
 # ---------------------------------------------------------------------------
 CORPORATIONS = [
     {
         "name": "Barwon Water",
         "slug": "barwon",
         "website": "https://www.barwonwater.vic.gov.au",
+        # Confirmed: barwonwater.vic.gov.au/about-us/at-a-glance/annual-report
         "report_pages": [
+            "/about-us/at-a-glance/annual-report",
             "/about-us/publications/annual-reports",
-            "/about/publications/annual-reports",
-            "/publications/annual-reports",
         ],
         "is_gww_predecessor": False,
     },
@@ -61,21 +60,22 @@ CORPORATIONS = [
         "name": "Central Highlands Water",
         "slug": "chw",
         "website": "https://www.chw.net.au",
+        # Confirmed: chw.net.au/about-us/reports-and-publications
+        # PDFs use /getmedia/ and cdn.chw.net.au paths (all end in .pdf)
         "report_pages": [
-            "/about-us/publications/annual-reports",
-            "/about/annual-reports",
-            "/publications/annual-reports",
+            "/about-us/reports-and-publications",
+            "/about-us/publications-and-reports",
         ],
         "is_gww_predecessor": False,
     },
     {
         "name": "City West Water",
         "slug": "citywest",
+        # citywestwater.com.au still exists (redirects to GWW branding) and
+        # hosts historical CWW annual reports at this path (underscores in URL).
         "website": "https://www.citywestwater.com.au",
         "report_pages": [
-            "/about-us/publications/annual-reports",
-            "/about/annual-report",
-            "/annual-reports",
+            "/about_us/reports_publications/annual_reports",
         ],
         "is_gww_predecessor": True,
     },
@@ -83,10 +83,9 @@ CORPORATIONS = [
         "name": "Coliban Water",
         "slug": "coliban",
         "website": "https://www.coliban.com.au",
+        # Confirmed: coliban.com.au/about-us/annual-reports
         "report_pages": [
-            "/about-us/publications/annual-reports",
-            "/about/annual-reports",
-            "/publications/annual-reports",
+            "/about-us/annual-reports",
         ],
         "is_gww_predecessor": False,
     },
@@ -94,10 +93,10 @@ CORPORATIONS = [
         "name": "East Gippsland Water",
         "slug": "egw",
         "website": "https://www.egwater.vic.gov.au",
+        # Confirmed: egwater.vic.gov.au/project_category/annual-reports/
         "report_pages": [
-            "/about-us/publications/annual-reports",
-            "/about/annual-reports",
-            "/publications",
+            "/project_category/annual-reports/",
+            "/publications/",
         ],
         "is_gww_predecessor": False,
     },
@@ -105,10 +104,9 @@ CORPORATIONS = [
         "name": "Greater Western Water",
         "slug": "gww",
         "website": "https://www.gww.com.au",
+        # Confirmed: gww.com.au/about/corporate-information/...
         "report_pages": [
-            "/about-us/publications/annual-reports",
-            "/about/annual-reports",
-            "/annual-reports",
+            "/about/corporate-information/our-strategies-plans-reports/annual-reports",
         ],
         "is_gww_predecessor": False,
     },
@@ -116,10 +114,10 @@ CORPORATIONS = [
         "name": "Goulburn Valley Water",
         "slug": "gvw",
         "website": "https://www.gvwater.vic.gov.au",
+        # Confirmed: gvwater.vic.gov.au/about-us/corporate-information/reports-and-plans
         "report_pages": [
+            "/about-us/corporate-information/reports-and-plans",
             "/about-us/publications/annual-reports",
-            "/about/annual-reports",
-            "/publications/annual-reports",
         ],
         "is_gww_predecessor": False,
     },
@@ -127,10 +125,10 @@ CORPORATIONS = [
         "name": "Lower Murray Water",
         "slug": "lmw",
         "website": "https://www.lmw.vic.gov.au",
+        # Confirmed: lmw.vic.gov.au/about-us/publications/annual-report/
         "report_pages": [
-            "/about-us/publications/annual-reports",
-            "/about/annual-reports",
-            "/publications",
+            "/about-us/publications/annual-report/",
+            "/publications/",
         ],
         "is_gww_predecessor": False,
     },
@@ -138,10 +136,11 @@ CORPORATIONS = [
         "name": "Melbourne Water",
         "slug": "melbwater",
         "website": "https://www.melbournewater.com.au",
+        # Confirmed: melbournewater.com.au/about/what-we-do/publications/annual-report
+        # NOTE: PDF links are /media/NNNNN/download (no .pdf extension) — handled in scraper
         "report_pages": [
-            "/about-us/publications/annual-reports",
-            "/about/publications/annual-report",
-            "/publications/annual-reports",
+            "/about/what-we-do/publications/annual-report",
+            "/about/what-we-do/publications",
         ],
         "is_gww_predecessor": False,
     },
@@ -149,10 +148,11 @@ CORPORATIONS = [
         "name": "North East Water",
         "slug": "new",
         "website": "https://www.newater.com.au",
+        # Confirmed: newater.com.au/about-us/corporate-documents/reports-plans-strategies
+        # PDFs at /Portals/0/NE-Water/Sections/.../Annual-reports/Annual-Report-YYYY-YY.pdf
         "report_pages": [
+            "/about-us/corporate-documents/reports-plans-strategies",
             "/about-us/publications/annual-reports",
-            "/about/annual-reports",
-            "/publications/annual-reports",
         ],
         "is_gww_predecessor": False,
     },
@@ -160,10 +160,10 @@ CORPORATIONS = [
         "name": "South East Water",
         "slug": "sew",
         "website": "https://www.southeastwater.com.au",
+        # Confirmed: southeastwater.com.au/about-us/our-strategy/reports-strategies-and-plans/
         "report_pages": [
-            "/about-us/publications/annual-reports",
-            "/about/annual-reports",
-            "/annual-reports",
+            "/about-us/our-strategy/reports-strategies-and-plans/",
+            "/about-us/corporate-info/reports-and-plans/",
         ],
         "is_gww_predecessor": False,
     },
@@ -171,10 +171,10 @@ CORPORATIONS = [
         "name": "Southern Rural Water",
         "slug": "srw",
         "website": "https://www.srw.com.au",
+        # Confirmed: srw.com.au/more/publications
         "report_pages": [
-            "/about-us/publications/annual-reports",
-            "/about/annual-reports",
-            "/publications",
+            "/more/publications",
+            "/about-us/publications",
         ],
         "is_gww_predecessor": False,
     },
@@ -182,32 +182,32 @@ CORPORATIONS = [
         "name": "South Gippsland Water",
         "slug": "sgw",
         "website": "https://www.sgwater.com.au",
+        # Confirmed: sgwater.com.au/publications/
         "report_pages": [
-            "/about-us/publications/annual-reports",
-            "/about/annual-reports",
-            "/publications/annual-reports",
+            "/publications/",
+            "/about-us/publications/",
         ],
         "is_gww_predecessor": False,
     },
     {
         "name": "Wannon Water",
         "slug": "wannon",
-        "website": "https://www.wannon.com.au",
+        # CORRECTED: was wannon.com.au — correct domain is wannonwater.com.au
+        "website": "https://www.wannonwater.com.au",
+        # Confirmed: wannonwater.com.au/about-us/annual-reports/
         "report_pages": [
-            "/about-us/publications/annual-reports",
-            "/about/annual-reports",
-            "/publications/annual-reports",
+            "/about-us/annual-reports/",
         ],
         "is_gww_predecessor": False,
     },
     {
         "name": "Western Water",
         "slug": "westernwater",
+        # westernwater.com.au may redirect to GWW; GWW also hosts WW's historical reports.
         "website": "https://www.westernwater.com.au",
         "report_pages": [
             "/about-us/publications/annual-reports",
-            "/about/annual-reports",
-            "/publications/annual-reports",
+            "/annual-reports",
         ],
         "is_gww_predecessor": True,
     },
@@ -215,10 +215,9 @@ CORPORATIONS = [
         "name": "Yarra Valley Water",
         "slug": "yvw",
         "website": "https://www.yvw.com.au",
+        # Confirmed: yvw.com.au/about-us/reports/annual-reports
         "report_pages": [
-            "/about-us/publications/annual-reports",
-            "/about/annual-reports",
-            "/publications/annual-reports",
+            "/about-us/reports/annual-reports",
         ],
         "is_gww_predecessor": False,
     },

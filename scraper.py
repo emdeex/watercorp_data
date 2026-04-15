@@ -25,6 +25,18 @@ VIEWER_PATTERNS = re.compile(
 )
 
 
+def _is_pdf_href(href: str) -> bool:
+    """
+    Return True if href points to a downloadable PDF.
+
+    Handles:
+      - Standard .pdf paths (including ?ext=.pdf query-string variants from Kentico CMS)
+      - Melbourne Water-style /media/NNNNN/download links (no .pdf extension)
+    """
+    path = urlparse(href).path.lower()
+    return path.endswith(".pdf") or path.endswith("/download")
+
+
 def _year_variants(year: str) -> list:
     """
     Return the set of substrings to look for in a URL or link text when
@@ -103,6 +115,10 @@ class AnnualReportScraper:
         """
         Fetch ``page_url`` and search for an ``<a>`` tag pointing to a PDF
         that matches the given financial year.
+
+        Matches:
+          - hrefs whose URL *path* ends in .pdf (handles ?ext=.pdf query params)
+          - hrefs ending in /download or /download/ (Melbourne Water style)
         """
         resp = self._get_with_retry(page_url)
         if resp is None:
@@ -114,7 +130,7 @@ class AnnualReportScraper:
         candidates = []
         for tag in soup.find_all("a", href=True):
             href: str = tag["href"]
-            if not href.lower().endswith(".pdf"):
+            if not _is_pdf_href(href):
                 continue
             if VIEWER_PATTERNS.search(href):
                 continue
@@ -130,11 +146,11 @@ class AnnualReportScraper:
         if candidates:
             return candidates[0]
 
-        # Fallback: if only one PDF link on page, assume it's the right one
+        # Fallback: if only one PDF/download link on page, assume it's the right one
         all_pdfs = [
             urljoin(page_url, tag["href"])
             for tag in soup.find_all("a", href=True)
-            if tag["href"].lower().endswith(".pdf")
+            if _is_pdf_href(tag["href"])
             and not VIEWER_PATTERNS.search(tag["href"])
         ]
         if len(all_pdfs) == 1:
