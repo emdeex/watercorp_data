@@ -36,6 +36,7 @@ async function loadConfig() {
     allYears = cfg.years;
     renderCorpList();
     renderYearList();
+    renderManualDropdowns();
     document.getElementById("btn-run").disabled = false;
   } catch (e) {
     logLine("Failed to load configuration: " + e, "error");
@@ -78,6 +79,26 @@ function renderYearList() {
 }
 
 // ---------------------------------------------------------------------------
+// Manual override dropdowns
+// ---------------------------------------------------------------------------
+function renderManualDropdowns() {
+  const corpSel = document.getElementById("manual-corp");
+  const yearSel = document.getElementById("manual-year");
+  allCorps.forEach(c => {
+    const opt = document.createElement("option");
+    opt.value = c.slug;
+    opt.textContent = c.name;
+    corpSel.appendChild(opt);
+  });
+  allYears.forEach(y => {
+    const opt = document.createElement("option");
+    opt.value = y;
+    opt.textContent = y;
+    yearSel.appendChild(opt);
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Control bindings
 // ---------------------------------------------------------------------------
 function bindControls() {
@@ -89,6 +110,7 @@ function bindControls() {
   document.getElementById("btn-calculate").addEventListener("click", runCalculate);
   document.getElementById("btn-dl-raw").addEventListener("click", downloadRawCsv);
   document.getElementById("btn-dl-results").addEventListener("click", downloadResultsCsv);
+  document.getElementById("btn-manual-process").addEventListener("click", runManual);
 }
 
 function setAllCheckboxes(selector, checked) {
@@ -213,6 +235,77 @@ async function runCalculate() {
   }
 
   document.getElementById("btn-calculate").disabled = false;
+}
+
+// ---------------------------------------------------------------------------
+// Manual override — URL or file upload
+// ---------------------------------------------------------------------------
+async function runManual() {
+  const slug    = document.getElementById("manual-corp").value;
+  const year    = document.getElementById("manual-year").value;
+  const useLlm  = document.getElementById("opt-llm").checked;
+  const pdfUrl  = document.getElementById("manual-pdf-url").value.trim();
+  const fileEl  = document.getElementById("manual-file");
+  const file    = fileEl.files[0];
+
+  if (!slug || !year) { alert("Select a corporation and year."); return; }
+
+  // Decide mode: file upload takes priority if a file is selected
+  const useUpload = !!file;
+  const useUrl    = !useUpload && !!pdfUrl;
+
+  if (!useUpload && !useUrl) {
+    alert("Paste a PDF URL or choose a file to upload.");
+    return;
+  }
+
+  const btn = document.getElementById("btn-manual-process");
+  btn.disabled = true;
+  btn.textContent = "Processing…";
+
+  // Switch to Progress tab so the user sees what's happening
+  const progressTab = document.querySelector('[data-bs-target="#tab-progress"]');
+  if (progressTab) bootstrap.Tab.getOrCreateInstance(progressTab).show();
+
+  try {
+    let row;
+    if (useUpload) {
+      logLine(`Manual upload: ${file.name} for ${slug} ${year}…`, "info");
+      const fd = new FormData();
+      fd.append("corp_slug", slug);
+      fd.append("year", year);
+      fd.append("use_llm", useLlm ? "true" : "false");
+      fd.append("file", file);
+      const resp = await fetch("/api/process-upload", { method: "POST", body: fd });
+      row = await resp.json();
+    } else {
+      logLine(`Manual URL: ${pdfUrl} for ${slug} ${year}…`, "info");
+      const resp = await fetch("/api/process-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ corp_slug: slug, year, pdf_url: pdfUrl, use_llm: useLlm }),
+      });
+      row = await resp.json();
+    }
+
+    rawData.push(row);
+    appendRawRow(row);
+    logResult(row);
+    if (row.status !== "ok") appendLogRow(row);
+
+    document.getElementById("btn-calculate").disabled = false;
+    document.getElementById("btn-dl-raw").disabled = false;
+
+    // Switch to Raw Data tab to show the result
+    const rawTab = document.querySelector('[data-bs-target="#tab-raw"]');
+    if (rawTab) bootstrap.Tab.getOrCreateInstance(rawTab).show();
+
+  } catch (e) {
+    logLine("Manual process error: " + e.message, "error");
+  }
+
+  btn.disabled = false;
+  btn.textContent = "Process";
 }
 
 // ---------------------------------------------------------------------------
