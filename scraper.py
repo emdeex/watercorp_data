@@ -11,11 +11,18 @@ from config import TMP_DIR
 
 logger = logging.getLogger(__name__)
 
+# Full browser-like headers to avoid 403s from WAF/Cloudflare-protected sites
 HEADERS = {
     "User-Agent": (
-        "Mozilla/5.0 (compatible; WaterCorpDataExtractor/1.0; "
-        "+https://github.com/emdeex/watercorp_data)"
-    )
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-AU,en;q=0.9",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Connection": "keep-alive",
+    "Upgrade-Insecure-Requests": "1",
 }
 
 # URL fragments that indicate a PDF viewer rather than a direct download
@@ -122,6 +129,7 @@ class AnnualReportScraper:
         """
         resp = self._get_with_retry(page_url)
         if resp is None:
+            logger.warning("Failed to fetch listing page %s", page_url)
             return None
 
         soup = BeautifulSoup(resp.text, "html.parser")
@@ -171,11 +179,19 @@ class AnnualReportScraper:
         return resp.content if resp.content else None
 
     def _get_with_retry(self, url: str) -> requests.Response | None:
-        """GET with exponential backoff (2 s, 4 s, 8 s)."""
+        """GET with exponential backoff (2 s, 4 s, 8 s).
+
+        Returns None on failure. For 403/404 from listing pages the caller
+        should log the status so the user gets a meaningful error.
+        """
         delay = 2
+        last_status = None
         for attempt in range(1, self.retries + 1):
             try:
                 resp = self.session.get(url, timeout=self.timeout, allow_redirects=True)
+                if resp.status_code == 403:
+                    logger.warning("403 Forbidden for %s (site may block scrapers)", url)
+                    return None  # no point retrying a 403
                 resp.raise_for_status()
                 return resp
             except requests.RequestException as exc:
