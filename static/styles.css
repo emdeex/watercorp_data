@@ -1,0 +1,43 @@
+/* General */
+body {
+  font-size: 0.875rem;
+}
+
+/* Confidence badges */
+.badge-high    { background-color: #198754; color: #fff; }
+.badge-medium  { background-color: #fd7e14; color: #fff; }
+.badge-low     { background-color: #dc3545; color: #fff; }
+.badge-failed  { background-color: #6c757d; color: #fff; }
+
+/* Progress log */
+#progress-log .log-ok      { color: #198754; }
+#progress-log .log-warn    { color: #fd7e14; }
+#progress-log .log-error   { color: #dc3545; }
+#progress-log .log-info    { color: #0d6efd; }
+
+/* Pivot table */
+#pivot-table th,
+#pivot-table td {
+  white-space: nowrap;
+  font-size: 0.8rem;
+  text-align: right;
+}
+#pivot-table th:first-child,
+#pivot-table td:first-child {
+  text-align: left;
+}
+.pivot-outlier {
+  background-color: #fff3cd !important;
+  color: #664d03;
+}
+.pivot-missing {
+  color: #adb5bd;
+}
+
+/* Sticky header on scrollable tables */
+.table-responsive thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f8f9fa;
+}
