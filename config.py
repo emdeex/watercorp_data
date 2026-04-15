@@ -194,10 +194,10 @@ CORPORATIONS = [
         "slug": "wannon",
         # CORRECTED: was wannon.com.au — correct domain is wannonwater.com.au
         "website": "https://www.wannonwater.com.au",
-        # Confirmed: strategies-plans-and-reports page lists all annual report PDFs
+        # Confirmed: wannonwater.com.au/about-us/publications/annual-report/
         "report_pages": [
+            "/about-us/publications/annual-report/",
             "/about-us/strategies-plans-and-reports/",
-            "/about-us/annual-reports/",
         ],
         "is_gww_predecessor": False,
     },
