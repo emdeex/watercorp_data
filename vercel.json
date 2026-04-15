@@ -1,8 +1,17 @@
 {
   "version": 2,
-  "builds": [{"src": "app.py", "use": "@vercel/python"}],
-  "routes": [{"src": "/(.*)", "dest": "app.py"}],
-  "functions": {
-    "app.py": { "maxDuration": 300 }
-  }
+  "builds": [
+    {
+      "src": "app.py",
+      "use": "@vercel/python",
+      "config": {
+        "maxLambdaSize": "50mb",
+        "includeFiles": ["templates/**", "static/**", "*.py"]
+      }
+    }
+  ],
+  "routes": [
+    { "src": "/static/(.*)", "dest": "/static/$1" },
+    { "src": "/(.*)", "dest": "app.py" }
+  ]
 }
