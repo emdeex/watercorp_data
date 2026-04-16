@@ -6,90 +6,44 @@
   <title>PDF URL Config — Victorian Water Corps</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <style>
-    .status-cached  { color: #198754; font-weight: 600; }
-    .status-missing { color: #adb5bd; }
-    .url-cell { font-size: 0.78rem; word-break: break-all; }
-    .corp-header { background: #f0f4ff; font-weight: 600; }
+    .corp-card { margin-bottom: 2rem; }
+    .corp-card .card-header { background: #e8edf8; font-weight: 600; font-size: 1rem; }
+    .url-input { font-size: 0.8rem; }
+    .status-cached  { color: #198754; font-size: 0.8rem; white-space: nowrap; }
+    .status-missing { color: #adb5bd; font-size: 0.8rem; white-space: nowrap; }
+    .year-label { font-weight: 500; white-space: nowrap; }
+    td, th { vertical-align: middle !important; }
   </style>
 </head>
 <body>
 
-<nav class="navbar navbar-dark bg-primary px-3 py-2 d-flex justify-content-between">
+<nav class="navbar navbar-dark bg-primary px-3 py-2 d-flex justify-content-between align-items-center">
   <span class="navbar-brand mb-0 h5">PDF URL Configuration</span>
-  <a href="/" class="btn btn-outline-light btn-sm">← Back to Extractor</a>
+  <div class="d-flex gap-2">
+    <button class="btn btn-outline-light btn-sm" id="btn-fetch-all-page">Download all uncached</button>
+    <button class="btn btn-outline-light btn-sm" id="btn-export">Export JSON</button>
+    <label class="btn btn-outline-light btn-sm mb-0">
+      Import JSON <input type="file" id="import-file" accept=".json" class="d-none">
+    </label>
+    <a href="/" class="btn btn-light btn-sm">← Extractor</a>
+  </div>
 </nav>
 
-<div class="container-fluid mt-3" style="max-width:1100px">
+<div class="container-fluid mt-3 px-4" style="max-width:1000px">
 
-  <!-- Add / Edit form -->
-  <div class="card mb-4">
-    <div class="card-header fw-semibold">Add or update a PDF URL</div>
-    <div class="card-body">
-      <div class="row g-2 align-items-end">
-        <div class="col-md-3">
-          <label class="form-label small mb-1">Corporation</label>
-          <select class="form-select form-select-sm" id="add-corp"></select>
-        </div>
-        <div class="col-md-2">
-          <label class="form-label small mb-1">Year</label>
-          <select class="form-select form-select-sm" id="add-year"></select>
-        </div>
-        <div class="col-md-5">
-          <label class="form-label small mb-1">Direct PDF URL</label>
-          <input type="url" class="form-control form-control-sm" id="add-url"
-                 placeholder="https://…/annual-report.pdf">
-        </div>
-        <div class="col-md-2 d-flex gap-2">
-          <button class="btn btn-primary btn-sm flex-fill" id="btn-save-url">Save</button>
-          <button class="btn btn-success btn-sm flex-fill" id="btn-save-fetch">Save &amp; Download</button>
-        </div>
-      </div>
-      <div id="add-status" class="mt-2 small"></div>
-    </div>
+  <div class="alert alert-info small py-2 mb-3">
+    Set a direct PDF URL for any year, then click <strong>Download</strong> to cache it on the server.
+    Cached PDFs are used automatically — the scraper is skipped.
+    Use <strong>Export JSON</strong> to back up your URLs; <strong>Import JSON</strong> to restore them.
   </div>
 
-  <!-- Configured overrides table -->
-  <div class="card mb-4">
-    <div class="card-header d-flex justify-content-between align-items-center">
-      <span class="fw-semibold">Configured URL overrides <span id="override-count" class="badge bg-secondary ms-1">0</span></span>
-      <div class="d-flex gap-2">
-        <button class="btn btn-outline-secondary btn-sm" id="btn-fetch-all">Download all PDFs</button>
-        <button class="btn btn-outline-secondary btn-sm" id="btn-export">Export JSON</button>
-        <label class="btn btn-outline-secondary btn-sm mb-0">
-          Import JSON <input type="file" id="import-file" accept=".json" class="d-none">
-        </label>
-      </div>
-    </div>
-    <div class="card-body p-0">
-      <div class="table-responsive">
-        <table class="table table-sm table-hover mb-0" id="overrides-table">
-          <thead class="table-light">
-            <tr>
-              <th>Corporation</th><th>Year</th><th>PDF URL</th>
-              <th>Cached</th><th class="text-end">Actions</th>
-            </tr>
-          </thead>
-          <tbody id="overrides-tbody">
-            <tr><td colspan="5" class="text-muted text-center py-3">Loading…</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+  <div id="toast-wrap" style="position:fixed;top:70px;right:20px;z-index:9999"></div>
+
+  <div id="corps-container">
+    <div class="text-center text-muted py-5">Loading…</div>
   </div>
 
-  <!-- Persistence note -->
-  <div class="alert alert-info small">
-    <strong>Persistence:</strong> URLs saved here are written to
-    <code>/tmp/pdf_url_overrides.json</code> on the server (survives warm restarts)
-    and to <code>pdf_url_overrides.json</code> in the app bundle when writable
-    (survives cold starts after redeploy).
-    Use <strong>Export JSON</strong> to save a local backup, and
-    <strong>Import JSON</strong> to restore after a cold start.
-    <br>For permanent storage, commit the exported file to the repository as
-    <code>pdf_url_overrides.json</code>.
-  </div>
-
-</div><!-- container -->
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
@@ -97,161 +51,247 @@
 
 let allCorps = [];
 let allYears = [];
-let overrides = [];  // [{key, slug, year, corp_name, url, cached}, ...]
+let overridesMap = {};   // key "slug/year" -> {url, cached}
 
 async function init() {
-  const cfg = await fetch("/api/config").then(r => r.json());
+  const [cfg, overridesList] = await Promise.all([
+    fetch("/api/config").then(r => r.json()),
+    fetch("/api/overrides").then(r => r.json()),
+  ]);
   allCorps = cfg.corporations;
   allYears = cfg.years;
-
-  const corpSel = document.getElementById("add-corp");
-  allCorps.forEach(c => {
-    const o = document.createElement("option");
-    o.value = c.slug; o.textContent = c.name;
-    corpSel.appendChild(o);
+  overridesMap = {};
+  overridesList.forEach(o => {
+    overridesMap[o.key] = { url: o.url, cached: o.cached };
   });
-  const yearSel = document.getElementById("add-year");
-  allYears.slice().reverse().forEach(y => {
-    const o = document.createElement("option");
-    o.value = y; o.textContent = y;
-    yearSel.appendChild(o);
-  });
-
-  await loadOverrides();
-  bindControls();
+  renderAll();
+  bindGlobal();
 }
 
-async function loadOverrides() {
-  overrides = await fetch("/api/overrides").then(r => r.json());
-  renderTable();
+// ---------------------------------------------------------------------------
+// Render
+// ---------------------------------------------------------------------------
+function renderAll() {
+  const container = document.getElementById("corps-container");
+  container.innerHTML = allCorps.map(corp => renderCorpCard(corp)).join("");
+
+  // Bind per-row buttons after DOM insertion
+  allCorps.forEach(corp => {
+    allYears.forEach(year => {
+      const key = `${corp.slug}/${year}`;
+      const saveBtn   = document.getElementById(`btn-save-${key}`);
+      const dlBtn     = document.getElementById(`btn-dl-${key}`);
+      if (saveBtn) saveBtn.addEventListener("click", () => saveRow(corp.slug, year));
+      if (dlBtn)   dlBtn.addEventListener("click",  () => downloadRow(corp.slug, year));
+    });
+  });
 }
 
-function renderTable() {
-  const tbody = document.getElementById("overrides-tbody");
-  document.getElementById("override-count").textContent = overrides.length;
+function renderCorpCard(corp) {
+  const rows = allYears.slice().reverse().map(year => {
+    const key = `${corp.slug}/${year}`;
+    const ov  = overridesMap[key];
+    const url = ov ? ov.url : "";
+    const cached = ov ? ov.cached : false;
+    const statusHtml = url
+      ? (cached
+          ? `<span class="status-cached">✓ cached</span>`
+          : `<span class="status-missing">not cached</span>`)
+      : `<span class="status-missing">—</span>`;
+    return `
+      <tr id="row-${esc(key)}">
+        <td class="year-label" style="width:90px">${esc(year)}</td>
+        <td>
+          <input type="url" class="form-control form-control-sm url-input"
+                 id="url-${esc(key)}"
+                 value="${esc(url)}"
+                 placeholder="https://…/annual-report.pdf">
+        </td>
+        <td style="width:110px" id="status-${esc(key)}">${statusHtml}</td>
+        <td style="width:160px" class="text-end">
+          <button class="btn btn-outline-primary btn-sm py-0 px-2 me-1"
+                  id="btn-save-${esc(key)}">Save</button>
+          <button class="btn btn-outline-success btn-sm py-0 px-2"
+                  id="btn-dl-${esc(key)}"
+                  ${url ? "" : "disabled"}>Download</button>
+        </td>
+      </tr>`;
+  }).join("");
 
-  if (!overrides.length) {
-    tbody.innerHTML = '<tr><td colspan="5" class="text-muted text-center py-3">No URLs configured yet.</td></tr>';
-    return;
+  const configuredCount = allYears.filter(y => overridesMap[`${corp.slug}/${y}`]).length;
+  const badge = configuredCount
+    ? `<span class="badge bg-success ms-2">${configuredCount} URL${configuredCount>1?"s":""} set</span>`
+    : `<span class="badge bg-secondary ms-2">no URLs set</span>`;
+
+  return `
+    <div class="card corp-card" id="corp-${esc(corp.slug)}">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span>${esc(corp.name)} ${badge}</span>
+        ${corp.is_gww_predecessor
+          ? '<span class="badge bg-warning text-dark">pre-merger (merged into GWW 2021-22)</span>'
+          : ""}
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Year</th>
+              <th>PDF URL</th>
+              <th>Status</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+// ---------------------------------------------------------------------------
+// Row actions
+// ---------------------------------------------------------------------------
+async function saveRow(slug, year) {
+  const key = `${slug}/${year}`;
+  const url = document.getElementById(`url-${key}`).value.trim();
+  await fetch("/api/overrides", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({slug, year, url}),
+  });
+  // Update local map
+  if (url) {
+    overridesMap[key] = { url, cached: overridesMap[key]?.cached || false };
+  } else {
+    delete overridesMap[key];
+  }
+  updateRowStatus(slug, year);
+  updateCorpBadge(slug);
+  // Enable/disable Download button
+  const dlBtn = document.getElementById(`btn-dl-${key}`);
+  if (dlBtn) dlBtn.disabled = !url;
+  toast(`Saved ${slug} ${year}`, "success");
+}
+
+async function downloadRow(slug, year) {
+  const key = `${slug}/${year}`;
+  // Auto-save URL first in case it changed
+  const url = document.getElementById(`url-${key}`)?.value.trim();
+  if (url && (!overridesMap[key] || overridesMap[key].url !== url)) {
+    await fetch("/api/overrides", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({slug, year, url}),
+    });
+    overridesMap[key] = { url, cached: false };
   }
 
-  tbody.innerHTML = overrides.map(row => `
-    <tr data-key="${esc(row.key)}">
-      <td>${esc(row.corp_name)}</td>
-      <td>${esc(row.year)}</td>
-      <td class="url-cell"><a href="${esc(row.url)}" target="_blank" rel="noopener">${esc(row.url)}</a></td>
-      <td>${row.cached
-        ? '<span class="status-cached">✓ cached</span>'
-        : '<span class="status-missing">not cached</span>'}</td>
-      <td class="text-end">
-        <button class="btn btn-outline-primary btn-sm py-0 me-1"
-                onclick="editRow('${esc(row.slug)}','${esc(row.year)}','${esc(row.url)}')">Edit</button>
-        <button class="btn btn-outline-success btn-sm py-0 me-1"
-                onclick="fetchRow('${esc(row.slug)}','${esc(row.year)}')">Download</button>
-        <button class="btn btn-outline-danger btn-sm py-0"
-                onclick="deleteRow('${esc(row.slug)}','${esc(row.year)}')">Delete</button>
-      </td>
-    </tr>`).join("");
-}
+  const dlBtn = document.getElementById(`btn-dl-${key}`);
+  if (dlBtn) { dlBtn.disabled = true; dlBtn.textContent = "…"; }
 
-function editRow(slug, year, url) {
-  document.getElementById("add-corp").value = slug;
-  document.getElementById("add-year").value = year;
-  document.getElementById("add-url").value  = url;
-  document.getElementById("add-url").focus();
-}
-
-async function deleteRow(slug, year) {
-  if (!confirm(`Delete URL override for ${slug} ${year}?`)) return;
-  await apiSave(slug, year, "");
-  await loadOverrides();
-}
-
-async function fetchRow(slug, year) {
-  setStatus(`Downloading ${slug} ${year}…`, "info");
   const r = await fetch("/api/overrides/fetch", {
     method: "POST",
     headers: {"Content-Type":"application/json"},
     body: JSON.stringify({slug, year}),
   }).then(r => r.json());
-  if (r.error) { setStatus(`Error: ${r.error}`, "danger"); return; }
-  setStatus(`Downloaded ${r.corp_name} ${year} (${r.size_kb} KB) — cached on server.`, "success");
-  await loadOverrides();
+
+  if (r.error) {
+    toast(`Download failed: ${r.error}`, "danger");
+  } else {
+    if (overridesMap[key]) overridesMap[key].cached = true;
+    updateRowStatus(slug, year);
+    toast(`Downloaded ${r.corp_name} ${year} (${r.size_kb} KB)`, "success");
+  }
+  if (dlBtn) { dlBtn.disabled = false; dlBtn.textContent = "Download"; }
 }
 
-async function apiSave(slug, year, url) {
-  return fetch("/api/overrides", {
-    method: "POST",
-    headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({slug, year, url}),
-  }).then(r => r.json());
+function updateRowStatus(slug, year) {
+  const key = `${slug}/${year}`;
+  const ov  = overridesMap[key];
+  const el  = document.getElementById(`status-${key}`);
+  if (!el) return;
+  if (!ov || !ov.url) {
+    el.innerHTML = `<span class="status-missing">—</span>`;
+  } else if (ov.cached) {
+    el.innerHTML = `<span class="status-cached">✓ cached</span>`;
+  } else {
+    el.innerHTML = `<span class="status-missing">not cached</span>`;
+  }
 }
 
-function setStatus(msg, type="info") {
-  const el = document.getElementById("add-status");
-  el.className = `text-${type}`;
-  el.textContent = msg;
+function updateCorpBadge(slug) {
+  const corp = allCorps.find(c => c.slug === slug);
+  if (!corp) return;
+  const count = allYears.filter(y => overridesMap[`${slug}/${y}`]).length;
+  const cardHeader = document.querySelector(`#corp-${slug} .card-header span:first-child`);
+  if (!cardHeader) return;
+  const badge = count
+    ? `<span class="badge bg-success ms-2">${count} URL${count>1?"s":""} set</span>`
+    : `<span class="badge bg-secondary ms-2">no URLs set</span>`;
+  cardHeader.innerHTML = `${esc(corp.name)} ${badge}`;
 }
 
-function bindControls() {
-  document.getElementById("btn-save-url").addEventListener("click", async () => {
-    const slug = document.getElementById("add-corp").value;
-    const year = document.getElementById("add-year").value;
-    const url  = document.getElementById("add-url").value.trim();
-    if (!url) { setStatus("Enter a URL first.", "warning"); return; }
-    await apiSave(slug, year, url);
-    setStatus(`Saved URL for ${slug} ${year}.`, "success");
-    document.getElementById("add-url").value = "";
-    await loadOverrides();
-  });
-
-  document.getElementById("btn-save-fetch").addEventListener("click", async () => {
-    const slug = document.getElementById("add-corp").value;
-    const year = document.getElementById("add-year").value;
-    const url  = document.getElementById("add-url").value.trim();
-    if (!url) { setStatus("Enter a URL first.", "warning"); return; }
-    setStatus(`Saving and downloading…`, "info");
-    await apiSave(slug, year, url);
-    await fetchRow(slug, year);
-    document.getElementById("add-url").value = "";
-  });
-
-  document.getElementById("btn-fetch-all").addEventListener("click", async () => {
-    const notCached = overrides.filter(r => !r.cached);
-    if (!notCached.length) { setStatus("All PDFs already cached.", "success"); return; }
-    setStatus(`Downloading ${notCached.length} PDF(s)…`, "info");
-    for (const r of notCached) {
-      await fetchRow(r.slug, r.year);
+// ---------------------------------------------------------------------------
+// Global actions
+// ---------------------------------------------------------------------------
+function bindGlobal() {
+  document.getElementById("btn-fetch-all-page").addEventListener("click", async () => {
+    const uncached = Object.entries(overridesMap)
+      .filter(([k, v]) => v.url && !v.cached)
+      .map(([k]) => k);
+    if (!uncached.length) { toast("All configured PDFs are already cached.", "info"); return; }
+    toast(`Downloading ${uncached.length} PDF(s)…`, "info");
+    for (const key of uncached) {
+      const [slug, year] = key.split("/", 2);
+      await downloadRow(slug, year);
     }
-    setStatus("All done.", "success");
+    toast("All done.", "success");
   });
 
   document.getElementById("btn-export").addEventListener("click", () => {
     const data = {};
-    overrides.forEach(r => { data[r.key] = r.url; });
-    const blob = new Blob([JSON.stringify(data, null, 2)], {type: "application/json"});
+    Object.entries(overridesMap).forEach(([k, v]) => { if (v.url) data[k] = v.url; });
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json"});
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = "pdf_url_overrides.json";
     a.click();
+    toast("Exported pdf_url_overrides.json", "success");
   });
 
-  document.getElementById("import-file").addEventListener("change", async (e) => {
+  document.getElementById("import-file").addEventListener("change", async e => {
     const file = e.target.files[0];
     if (!file) return;
-    const text = await file.text();
     let data;
-    try { data = JSON.parse(text); } catch { setStatus("Invalid JSON file.", "danger"); return; }
+    try { data = JSON.parse(await file.text()); }
+    catch { toast("Invalid JSON file.", "danger"); return; }
     const r = await fetch("/api/overrides/import", {
       method: "POST",
       headers: {"Content-Type":"application/json"},
       body: JSON.stringify({overrides: data}),
     }).then(r => r.json());
-    if (r.error) { setStatus(`Import error: ${r.error}`, "danger"); return; }
-    setStatus(`Imported ${r.count} URL(s).`, "success");
-    await loadOverrides();
+    if (r.error) { toast(`Import error: ${r.error}`, "danger"); return; }
+    toast(`Imported ${r.count} URL(s). Reloading…`, "success");
+    await init();
     e.target.value = "";
   });
+}
+
+// ---------------------------------------------------------------------------
+// Toast helper
+// ---------------------------------------------------------------------------
+function toast(msg, type="info") {
+  const wrap = document.getElementById("toast-wrap");
+  const id   = "t" + Date.now();
+  wrap.insertAdjacentHTML("beforeend", `
+    <div id="${id}" class="toast align-items-center text-bg-${type} border-0 mb-2 show"
+         role="alert" style="min-width:260px">
+      <div class="d-flex">
+        <div class="toast-body small">${esc(msg)}</div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto"
+                onclick="document.getElementById('${id}').remove()"></button>
+      </div>
+    </div>`);
+  setTimeout(() => document.getElementById(id)?.remove(), 4000);
 }
 
 function esc(s) {
